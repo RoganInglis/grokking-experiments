@@ -1,0 +1,7 @@
+_target_: src.datamodules.modulo_addition_datamodule.ModuloAdditionDataModule
+p: 113
+train_ratio: 0.3
+seed: 42
+batch_size: 3830  # p * p * train_ratio
+num_workers: 0
+pin_memory: False

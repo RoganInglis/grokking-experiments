@@ -24,6 +24,17 @@ class PositionalEncoding(nn.Module):
         return x + pos.unsqueeze(0)
 
 
+class LearnedPositionalEncoding(nn.Module):
+    def __init__(self, dim_model, max_len=512):
+        super().__init__()
+        self.d_model = dim_model
+        self.pe = nn.Embedding(max_len, dim_model)
+
+    def forward(self, x):
+        pos = torch.arange(0, x.shape[1], device=x.device).unsqueeze(0)
+        return x + self.pe(pos)
+
+
 class MultiHeadAttention(nn.Module):
     def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dropout=0.):
         """
@@ -195,7 +206,7 @@ class DecoderLayer(nn.Module):
         return self.norm_3(x)
 
 
-class Encoder(nn.Module):
+class Transformer(nn.Module):
     def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, num_layers=6, dropout=0.):
         super().__init__()
 
@@ -210,59 +221,28 @@ class Encoder(nn.Module):
         return x
 
 
-class Decoder(nn.Module):
-    def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, num_layers=6, dropout=0.):
-        super().__init__()
-
-        self.layers = nn.ModuleList([
-            DecoderLayer(dim_model, num_heads, dim_heads, dim_inner, dropout)
-            for _ in range(num_layers)
-        ])
-
-    def forward(self, x, mem, src_mask=None, tgt_mask=None):
-        for layer in self.layers:
-            x = layer(x, mem, src_mask, tgt_mask)
-        return x
-
-
-class Transformer(nn.Module):
-    def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, num_layers=6, dropout=0.):
-        """
-        Computes the transformer from the paper Attention is all you need (https://arxiv.org/abs/1706.03762)
-        :param dim_model: The dimensionality of the input and output vectors
-        :param num_heads: The number of attention heads
-        :param dim_heads: The dimensionality of the attention heads
-        :param dim_inner: The dimensionality of the inner feedforward layer
-        :param num_layers: The number of encoder and decoder layers
-        :param dropout: The dropout probability
-        """
-        super().__init__()
-        self.encoder = Encoder(dim_model, num_heads, dim_heads, dim_inner, num_layers, dropout)
-        self.decoder = Decoder(dim_model, num_heads, dim_heads, dim_inner, num_layers, dropout)
-
-    def forward(self, src, tgt, src_mask=None, tgt_mask=None):
-        mem = self.encoder(src, src_mask)
-        return self.decoder(tgt, mem, src_mask, tgt_mask)
-
-
 class TransformerWrapper(nn.Module):
-    def __init__(self, vocab_size, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, num_layers=6, dropout=0.):
+    def __init__(self, vocab_size, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, num_layers=6, dropout=0.,
+                 tie_emb_weights=True, max_len=1000):
         super().__init__()
         self.emb = nn.Embedding(vocab_size, dim_model)
-        self.pos_enc = PositionalEncoding(dim_model)
+        self.pos_enc = LearnedPositionalEncoding(dim_model, max_len=max_len)
         self.dropout = nn.Dropout(dropout)
         self.transformer = Transformer(
-            dim_model,
-            num_heads,
-            dim_heads,
-            dim_inner,
-            num_layers,
-            dropout
+            dim_model=dim_model,
+            num_heads=num_heads,
+            dim_heads=dim_heads,
+            dim_inner=dim_inner,
+            num_layers=num_layers,
+            dropout=dropout
         )
         self.out = nn.Linear(dim_model, vocab_size)
-        self.out.weight = self.emb.weight
+        if tie_emb_weights:
+            self.out.weight = self.emb.weight
 
-    def forward(self, src, tgt):
-        src = self.dropout(self.pos_enc(self.emb(src) * math.sqrt(self.emb.embedding_dim)))
-        tgt = self.dropout(self.pos_enc(self.emb(tgt) * math.sqrt(self.emb.embedding_dim)))
-        return self.out(self.transformer(src, tgt)) * math.sqrt(self.emb.embedding_dim)
+        self.register_buffer('attn_mask', create_attn_mask(max_len))
+
+    def forward(self, x):
+        x = self.dropout(self.pos_enc(self.emb(x)))  # * math.sqrt(self.emb.embedding_dim)))
+        x = self.transformer(x, mask=self.attn_mask[:x.size(1), :x.size(1)])
+        return self.out(x)

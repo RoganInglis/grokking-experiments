@@ -4,7 +4,7 @@ import numpy as np
 
 
 class ModuloAdditionDataset(Dataset):
-    def __init__(self, p=113, train_ratio=0.7, seed=42):
+    def __init__(self, p=113, train_ratio=0.7, seed=42, mode='train'):
         self.p = p
         self.train_ratio = train_ratio
         np.random.seed(seed)
@@ -15,41 +15,23 @@ class ModuloAdditionDataset(Dataset):
         # Shuffle and split into train and test
         np.random.shuffle(pairs)
         split_point = int(len(pairs) * train_ratio)
-        self.train_pairs = pairs[:split_point]
-        self.test_pairs = pairs[split_point:]
+
+        if mode == 'train':
+            self.pairs = pairs[:split_point]
+        else:
+            self.pairs = pairs[split_point:]
 
     def __len__(self):
         # Depending on whether we are in train or test mode, the total length will change
-        if self.training:
-            return len(self.train_pairs)
-        else:
-            return len(self.test_pairs)
-
-    def set_mode(self, mode):
-        if mode == "train":
-            self.training = True
-        elif mode == "test":
-            self.training = False
-        else:
-            raise ValueError("Mode can be either 'train' or 'test'")
+        return len(self.pairs)
 
     def __getitem__(self, idx):
-        # Depending on the mode we are in, we either choose from the training pairs or test pairs
-        if self.training:
-            pair = self.train_pairs[idx]
-        else:
-            pair = self.test_pairs[idx]
-
-        a, b = pair
-
-        # Create one-hot encodings for a and b
-        a_one_hot = torch.zeros(self.p)
-        a_one_hot[a] = 1
-        b_one_hot = torch.zeros(self.p)
-        b_one_hot[b] = 1
+        a, b = self.pairs[idx]
+        x = torch.tensor([a, b, self.p], dtype=torch.int32)
 
         # Perform the addition operation
         c = (a + b) % self.p
+        y = torch.tensor(c, dtype=torch.int32)
 
         # Return the one-hot encoded inputs and the result
-        return a_one_hot, b_one_hot, c
+        return x, y
