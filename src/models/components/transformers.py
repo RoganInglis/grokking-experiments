@@ -143,7 +143,7 @@ class LayerNorm(nn.Module):
 
 
 class EncoderLayer(nn.Module):
-    def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, dropout=0.):
+    def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, dropout=0., layer_norm=True):
         """
         Computes the encoder layer from the paper Attention is all you need (https://arxiv.org/abs/1706.03762)
         :param dim_model: The dimensionality of the input and output vectors
@@ -153,11 +153,14 @@ class EncoderLayer(nn.Module):
         :param dropout: The dropout probability
         """
         super().__init__()
+        self.layer_norm = layer_norm
 
         self.attn = Residual(MultiHeadAttention(dim_model, num_heads, dim_heads, dropout))
         self.ff = Residual(FeedForward(dim_model, dim_inner, dropout))
-        self.norm_1 = LayerNorm(dim_model)
-        self.norm_2 = LayerNorm(dim_model)
+
+        if self.layer_norm:
+            self.norm_1 = LayerNorm(dim_model)
+            self.norm_2 = LayerNorm(dim_model)
 
     def forward(self, x, mask=None):
         """
@@ -166,13 +169,16 @@ class EncoderLayer(nn.Module):
         :return:
         """
         x = self.attn(x, x, x, mask)
-        x = self.norm_1(x)
+        if self.layer_norm:
+            x = self.norm_1(x)
         x = self.ff(x)
-        return self.norm_2(x)
+        if self.layer_norm:
+            return self.norm_2(x)
+        return x
 
 
 class DecoderLayer(nn.Module):
-    def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, dropout=0.):
+    def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, dropout=0., layer_norm=True):
         """
         Computes the decoder layer from the paper Attention is all you need (https://arxiv.org/abs/1706.03762)
         :param dim_model: The dimensionality of the input and output vectors
@@ -180,15 +186,18 @@ class DecoderLayer(nn.Module):
         :param dim_heads: The dimensionality of the attention heads
         :param dim_inner: The dimensionality of the inner feedforward layer
         :param dropout: The dropout probability
+        :param layer_norm: Whether to apply layer normalization
         """
         super().__init__()
+        self.layer_norm = layer_norm
 
         self.attn_1 = Residual(MultiHeadAttention(dim_model, num_heads, dim_heads, dropout))
         self.attn_2 = Residual(MultiHeadAttention(dim_model, num_heads, dim_heads, dropout))
         self.ff = Residual(FeedForward(dim_model, dim_inner, dropout))
-        self.norm_1 = LayerNorm(dim_model)
-        self.norm_2 = LayerNorm(dim_model)
-        self.norm_3 = LayerNorm(dim_model)
+        if self.layer_norm:
+            self.norm_1 = LayerNorm(dim_model)
+            self.norm_2 = LayerNorm(dim_model)
+            self.norm_3 = LayerNorm(dim_model)
 
     def forward(self, x, mem, src_mask=None, tgt_mask=None):
         """
@@ -199,19 +208,24 @@ class DecoderLayer(nn.Module):
         :return:
         """
         x = self.attn_1(x, x, x, tgt_mask)
-        x = self.norm_1(x)
+        if self.layer_norm:
+            x = self.norm_1(x)
         x = self.attn_2(x, mem, mem, src_mask)
-        x = self.norm_2(x)
+        if self.layer_norm:
+            x = self.norm_2(x)
         x = self.ff(x)
-        return self.norm_3(x)
+        if self.layer_norm:
+            return self.norm_3(x)
+        return x
 
 
 class Transformer(nn.Module):
-    def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, num_layers=6, dropout=0.):
+    def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, num_layers=6, dropout=0.,
+                 layer_norm=True):
         super().__init__()
 
         self.layers = nn.ModuleList([
-            EncoderLayer(dim_model, num_heads, dim_heads, dim_inner, dropout)
+            EncoderLayer(dim_model, num_heads, dim_heads, dim_inner, dropout, layer_norm=layer_norm)
             for _ in range(num_layers)
         ])
 
@@ -223,7 +237,7 @@ class Transformer(nn.Module):
 
 class TransformerWrapper(nn.Module):
     def __init__(self, vocab_size, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, num_layers=6, dropout=0.,
-                 tie_emb_weights=True, max_len=1000):
+                 tie_emb_weights=True, max_len=1000, layer_norm=True):
         super().__init__()
         self.emb = nn.Embedding(vocab_size, dim_model)
         self.pos_enc = LearnedPositionalEncoding(dim_model, max_len=max_len)
@@ -234,7 +248,8 @@ class TransformerWrapper(nn.Module):
             dim_heads=dim_heads,
             dim_inner=dim_inner,
             num_layers=num_layers,
-            dropout=dropout
+            dropout=dropout,
+            layer_norm=layer_norm
         )
         self.out = nn.Linear(dim_model, vocab_size)
         if tie_emb_weights:
