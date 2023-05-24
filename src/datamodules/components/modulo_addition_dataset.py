@@ -33,5 +33,4 @@ class ModuloAdditionDataset(Dataset):
         c = (a + b) % self.p
         y = torch.tensor(c, dtype=torch.int32)
 
-        # Return the one-hot encoded inputs and the result
         return x, y

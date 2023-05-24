@@ -23,7 +23,7 @@ net:
   dim_inner: 512
   num_layers: 1
   dropout: 0.
-  tie_emb_weights: true
+  tie_emb_weights: false
   max_len: 3
   layer_norm: false
 

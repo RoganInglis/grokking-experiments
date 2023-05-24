@@ -63,7 +63,7 @@ class MultiHeadAttention(nn.Module):
         :param x_q: Tensor of shape (batch_size, seq_len_q, dim_model) containing the query vectors
         :param x_k: Tensor of shape (batch_size, seq_len_k, dim_model) containing the key vectors
         :param x_v: Tensor of shape (batch_size, seq_len_v, dim_model) containing the value vectors
-        :param mask: Tensor of shape (batch_size, seq_len_q, seq_len_k) containing the mask for the attention
+        :param mask: Tensor of shape (seq_len_q, seq_len_k) containing the mask for the attention
         :return:
         """
         # Project to query, key, value and split into heads
@@ -165,7 +165,7 @@ class EncoderLayer(nn.Module):
     def forward(self, x, mask=None):
         """
         :param x: Tensor of shape (batch_size, seq_len, dim_model). Input to the encoder layer.
-        :param mask: Tensor of shape (batch_size, seq_len, seq_len). Mask to be applied to the attention weights.
+        :param mask: Tensor of shape (seq_len, seq_len). Mask to be applied to the attention weights.
         :return:
         """
         x = self.attn(x, x, x, mask)
@@ -203,8 +203,8 @@ class DecoderLayer(nn.Module):
         """
         :param x: Tensor of shape (batch_size, seq_len, dim_model). The input to the decoder.
         :param mem: Tensor of shape (batch_size, seq_len, dim_model). The memory from the encoder.
-        :param src_mask: Tensor of shape (batch_size, 1, seq_len). The mask for the encoder.
-        :param tgt_mask: Tensor of shape (batch_size, seq_len, seq_len). The mask for the decoder.
+        :param src_mask: Tensor of shape (1, seq_len). The mask for the encoder.
+        :param tgt_mask: Tensor of shape (seq_len, seq_len). The mask for the decoder.
         :return:
         """
         x = self.attn_1(x, x, x, tgt_mask)
@@ -225,7 +225,14 @@ class Transformer(nn.Module):
         super().__init__()
 
         self.layers = nn.ModuleList([
-            EncoderLayer(dim_model, num_heads, dim_heads, dim_inner, dropout, layer_norm=layer_norm)
+            EncoderLayer(
+                dim_model,
+                num_heads,
+                dim_heads,
+                dim_inner,
+                dropout,
+                layer_norm=layer_norm
+            )
             for _ in range(num_layers)
         ])
 
@@ -251,13 +258,13 @@ class TransformerWrapper(nn.Module):
             dropout=dropout,
             layer_norm=layer_norm
         )
-        self.out = nn.Linear(dim_model, vocab_size)
+        self.out = nn.Linear(dim_model, vocab_size, bias=False)
         if tie_emb_weights:
             self.out.weight = self.emb.weight
 
         self.register_buffer('attn_mask', create_attn_mask(max_len))
 
     def forward(self, x):
-        x = self.dropout(self.pos_enc(self.emb(x)))  # * math.sqrt(self.emb.embedding_dim)))
+        x = self.dropout(self.pos_enc(self.emb(x)))  # / math.sqrt(self.emb.embedding_dim)))
         x = self.transformer(x, mask=self.attn_mask[:x.size(1), :x.size(1)])
         return self.out(x)

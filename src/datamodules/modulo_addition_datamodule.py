@@ -44,6 +44,8 @@ class ModuloAdditionDataModule(LightningDataModule):
                 seed=self.hparams.seed,
                 mode='train'
             )
+            # Use test set for both validation and test since both validation and test should be specified for Pytorch
+            # Lightning but the paper only uses train and test set
             self.data_val = ModuloAdditionDataset(
                 p=self.hparams.p,
                 train_ratio=self.hparams.train_ratio,
