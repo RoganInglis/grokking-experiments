@@ -48,7 +48,7 @@ class TransformerLitModule(LightningModule):
     def step(self, batch: Any):
         x, y = batch
         logits = self.forward(x)
-        logits = logits[:, -1, :]
+        logits = logits[:, -1, :].to(torch.float64)
         loss = self.criterion(logits, y.long())
         preds = torch.argmax(logits, dim=1)
         return loss, preds, y
