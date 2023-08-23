@@ -1,5 +1,6 @@
 import math
 import torch
+import numpy as np
 from torch import nn
 
 import einops
@@ -28,11 +29,29 @@ class LearnedPositionalEncoding(nn.Module):
     def __init__(self, dim_model, max_len=512):
         super().__init__()
         self.d_model = dim_model
-        self.pe = nn.Embedding(max_len, dim_model)
+        self.pe = nn.Embedding(max_len, dim_model, _weight=torch.randn(max_len, dim_model) / np.sqrt(dim_model))
 
     def forward(self, x):
         pos = torch.arange(0, x.shape[1], device=x.device).unsqueeze(0)
         return x + self.pe(pos)
+
+
+class Linear(nn.Module):
+    def __init__(self, in_features, out_features, bias=True):
+        """
+        Computes a linear layer with sqrt initialization
+        """
+        super().__init__()
+        self.W = nn.Parameter(torch.randn(in_features, out_features) / np.sqrt(out_features))
+        self.bias = bias
+        if self.bias:
+            self.b = nn.Parameter(torch.zeros(out_features))
+
+    def forward(self, x):
+        x = x @ self.W
+        if self.bias:
+            x += self.b
+        return x
 
 
 class MultiHeadAttention(nn.Module):
@@ -53,8 +72,8 @@ class MultiHeadAttention(nn.Module):
 
         self.scale = dim_heads ** -0.5
 
-        self.w_qkv = nn.Linear(in_features=dim_model, out_features=self.dim_inner)
-        self.w_out = nn.Linear(in_features=self.dim_inner, out_features=dim_model)
+        self.w_qkv = nn.Linear(in_features=dim_model, out_features=self.dim_inner, bias=False)
+        self.w_out = nn.Linear(in_features=self.dim_inner, out_features=dim_model, bias=False)
         self.softmax = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
 
@@ -101,7 +120,7 @@ class FeedForward(nn.Module):
 
         self.net = nn.Sequential(
             nn.Linear(dim_model, dim_inner),
-            nn.GELU(),
+            nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(dim_inner, dim_model),
             nn.Dropout(dropout),
@@ -109,6 +128,15 @@ class FeedForward(nn.Module):
 
     def forward(self, x):
         return self.net(x)
+
+
+class ParallelFeedForward(nn.Module):
+    def __init__(self, dim_model=512, dim_inner=2048, dropout=0., n_parallel=1):
+        super().__init__()
+        self.layers = nn.ModuleList([FeedForward(dim_model, dim_inner, dropout) for _ in range(n_parallel)])
+
+    def forward(self, x):
+        return torch.sum(torch.stack([layer(x) for layer in self.layers]), dim=0)
 
 
 class Residual(nn.Module):
@@ -246,7 +274,7 @@ class TransformerWrapper(nn.Module):
     def __init__(self, vocab_size, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, num_layers=6, dropout=0.,
                  tie_emb_weights=True, max_len=1000, layer_norm=True):
         super().__init__()
-        self.emb = nn.Embedding(vocab_size, dim_model)
+        self.emb = nn.Parameter(torch.randn(vocab_size, dim_model) / np.sqrt(dim_model))
         self.pos_enc = LearnedPositionalEncoding(dim_model, max_len=max_len)
         self.dropout = nn.Dropout(dropout)
         self.transformer = Transformer(
@@ -258,13 +286,18 @@ class TransformerWrapper(nn.Module):
             dropout=dropout,
             layer_norm=layer_norm
         )
-        self.out = nn.Linear(dim_model, vocab_size, bias=False)
-        if tie_emb_weights:
-            self.out.weight = self.emb.weight
+        self.tie_emb_weights = tie_emb_weights
+        if not self.tie_emb_weights:
+            self.out = nn.Parameter(torch.randn(dim_model, vocab_size) / np.sqrt(vocab_size))
 
         self.register_buffer('attn_mask', create_attn_mask(max_len))
 
     def forward(self, x):
-        x = self.dropout(self.pos_enc(self.emb(x)))  # / math.sqrt(self.emb.embedding_dim)))
+        x = self.emb[x]
+        x = self.pos_enc(x)  # / math.sqrt(self.emb.embedding_dim)))
+        x = self.dropout(x)
         x = self.transformer(x, mask=self.attn_mask[:x.size(1), :x.size(1)])
-        return self.out(x)
+        if self.tie_emb_weights:
+            return x @ self.emb.T
+        else:
+            return x @ self.out

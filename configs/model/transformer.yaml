@@ -7,12 +7,12 @@ optimizer:
   betas: [0.9, 0.98]
   weight_decay: 1.0
 
-scheduler:
-  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  _partial_: true
-  mode: min
-  factor: 0.1
-  patience: 1000000000  # effectively no decay
+#scheduler:
+#  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+#  _partial_: true
+#  mode: min
+#  factor: 0.1
+#  patience: 1000000000  # effectively no decay
 
 net:
   _target_: src.models.components.transformers.TransformerWrapper

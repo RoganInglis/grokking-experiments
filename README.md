@@ -24,6 +24,15 @@ the same general set-up to aid my understanding and intuition of the phenomena d
 - [ ] reproduce the analysis from the paper
 - [ ] run additional experiments
 
+## Notes
+### Loss Spikes
+I observed loss spikes during training to begin with. I initially assumed this must be the same phenomenon as described 
+[here](https://www.alignmentforum.org/posts/N6WM6hs7RQMKDhYjB/a-mechanistic-interpretability-analysis-of-grokking) but 
+in this case it didn't appear to be solved just by using the `cross_entropy_high_precision` function from the 
+[original implementation](https://github.com/mechanistic-interpretability-grokking/progress-measures-paper/tree/main).
+I found that the initialisation of the embed, unembed and positional encoding weights was the cause - in the 
+original implementation they are initialised with a normal distribution normalised by the sqrt of the output dimension.
+
 ## How to run
 
 Install dependencies

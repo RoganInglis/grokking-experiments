@@ -11,7 +11,7 @@ class TransformerLitModule(LightningModule):
         self,
         net: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
-        scheduler: torch.optim.lr_scheduler,
+        scheduler: torch.optim.lr_scheduler = None,
     ):
         super().__init__()
 
@@ -45,16 +45,17 @@ class TransformerLitModule(LightningModule):
         # so we need to make sure val_acc_best doesn't store accuracy from these checks
         self.val_acc_best.reset()
 
-    def step(self, batch: Any):
+    def step(self, batch: Any, verbose=False):
         x, y = batch
         logits = self.forward(x)
-        logits = logits[:, -1, :].to(torch.float64)
-        loss = self.criterion(logits, y.long())
+        logits = logits[:, -1, :]
+        loss = self.criterion(logits.to(torch.float64), y.long())
+
         preds = torch.argmax(logits, dim=1)
         return loss, preds, y
 
     def training_step(self, batch: Any, batch_idx: int):
-        loss, preds, targets = self.step(batch)
+        loss, preds, targets = self.step(batch, verbose=False)
 
         # update and log metrics
         self.train_loss(loss)
