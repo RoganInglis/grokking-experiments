@@ -19,6 +19,11 @@ the same general set-up to aid my understanding and intuition of the phenomena d
 
 ![Fourier Embedding](images/fourier_embedding.gif)
 
+Using Softmax1 as proposed [here](https://www.evanmiller.org/attention-is-off-by-one.html) appears to produce cleaner 
+fourier components than the original Softmax. Could investigate this further.
+
+![Fourier Embedding Softmax1](images/fourier_embedding_softmax_1.gif)
+
 
 ## TODO
 - [x] implement dataset and datamodule
