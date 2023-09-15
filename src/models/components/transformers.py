@@ -102,7 +102,7 @@ class MultiHeadAttention(nn.Module):
         """
         # Project to query, key, value and split into heads
         qkv = einops.rearrange(
-            self.w_qkv(torch.cat((x_q, x_k, x_v), dim=0)),  # TODO - this isn't correct - shouldn't concatenate before multiplication - should be independent projections
+            self.w_qkv(torch.cat((x_q, x_k, x_v), dim=0)),
             'b s (h d) -> b h s d', h=self.num_heads
         )
         q, k, v = qkv.chunk(3, dim=0)

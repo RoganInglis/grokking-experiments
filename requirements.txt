@@ -28,3 +28,4 @@ kaleido
 plotly
 pandas
 imageio
+torchlens
