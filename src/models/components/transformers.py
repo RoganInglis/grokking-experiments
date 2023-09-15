@@ -10,6 +10,18 @@ def create_attn_mask(seq_len):
     return torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
 
 
+class Softmax1(nn.Module):
+    def __init__(self, dim=-1):
+        super().__init__()
+        self.dim = dim
+
+    def forward(self, x):
+        # subtract the max for stability
+        x = x - x.max(dim=self.dim, keepdim=True).values
+
+        return torch.exp(x) / 1 + (torch.exp(x).sum(dim=self.dim, keepdim=True))
+
+
 class PositionalEncoding(nn.Module):
     def __init__(self, dim_model):
         super().__init__()
@@ -55,7 +67,7 @@ class Linear(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dropout=0.):
+    def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dropout=0., use_softmax1: bool = False):
         """
         Computes the multi-head attention from the paper Attention is all you need (https://arxiv.org/abs/1706.03762)
         :param dim_model: The dimensionality of the input and output vectors
@@ -74,7 +86,10 @@ class MultiHeadAttention(nn.Module):
 
         self.w_qkv = nn.Linear(in_features=dim_model, out_features=self.dim_inner, bias=False)
         self.w_out = nn.Linear(in_features=self.dim_inner, out_features=dim_model, bias=False)
-        self.softmax = nn.Softmax(dim=-1)
+        if use_softmax1:
+            self.softmax = Softmax1(dim=-1)
+        else:
+            self.softmax = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x_q, x_k, x_v, mask=None):
@@ -87,7 +102,7 @@ class MultiHeadAttention(nn.Module):
         """
         # Project to query, key, value and split into heads
         qkv = einops.rearrange(
-            self.w_qkv(torch.cat((x_q, x_k, x_v), dim=0)),
+            self.w_qkv(torch.cat((x_q, x_k, x_v), dim=0)),  # TODO - this isn't correct - shouldn't concatenate before multiplication - should be independent projections
             'b s (h d) -> b h s d', h=self.num_heads
         )
         q, k, v = qkv.chunk(3, dim=0)
@@ -171,7 +186,8 @@ class LayerNorm(nn.Module):
 
 
 class EncoderLayer(nn.Module):
-    def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, dropout=0., layer_norm=True):
+    def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, dropout=0., layer_norm=True,
+                 use_softmax1: bool = False):
         """
         Computes the encoder layer from the paper Attention is all you need (https://arxiv.org/abs/1706.03762)
         :param dim_model: The dimensionality of the input and output vectors
@@ -183,7 +199,7 @@ class EncoderLayer(nn.Module):
         super().__init__()
         self.layer_norm = layer_norm
 
-        self.attn = Residual(MultiHeadAttention(dim_model, num_heads, dim_heads, dropout))
+        self.attn = Residual(MultiHeadAttention(dim_model, num_heads, dim_heads, dropout, use_softmax1=use_softmax1))
         self.ff = Residual(FeedForward(dim_model, dim_inner, dropout))
 
         if self.layer_norm:
@@ -206,7 +222,8 @@ class EncoderLayer(nn.Module):
 
 
 class DecoderLayer(nn.Module):
-    def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, dropout=0., layer_norm=True):
+    def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, dropout=0., layer_norm=True,
+                 use_softmax1: bool = False):
         """
         Computes the decoder layer from the paper Attention is all you need (https://arxiv.org/abs/1706.03762)
         :param dim_model: The dimensionality of the input and output vectors
@@ -219,8 +236,8 @@ class DecoderLayer(nn.Module):
         super().__init__()
         self.layer_norm = layer_norm
 
-        self.attn_1 = Residual(MultiHeadAttention(dim_model, num_heads, dim_heads, dropout))
-        self.attn_2 = Residual(MultiHeadAttention(dim_model, num_heads, dim_heads, dropout))
+        self.attn_1 = Residual(MultiHeadAttention(dim_model, num_heads, dim_heads, dropout, use_softmax1=use_softmax1))
+        self.attn_2 = Residual(MultiHeadAttention(dim_model, num_heads, dim_heads, dropout, use_softmax1=use_softmax1))
         self.ff = Residual(FeedForward(dim_model, dim_inner, dropout))
         if self.layer_norm:
             self.norm_1 = LayerNorm(dim_model)
@@ -249,7 +266,7 @@ class DecoderLayer(nn.Module):
 
 class Transformer(nn.Module):
     def __init__(self, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, num_layers=6, dropout=0.,
-                 layer_norm=True):
+                 layer_norm=True, use_softmax1: bool = False):
         super().__init__()
 
         self.layers = nn.ModuleList([
@@ -259,7 +276,8 @@ class Transformer(nn.Module):
                 dim_heads,
                 dim_inner,
                 dropout,
-                layer_norm=layer_norm
+                layer_norm=layer_norm,
+                use_softmax1=use_softmax1
             )
             for _ in range(num_layers)
         ])
@@ -272,7 +290,7 @@ class Transformer(nn.Module):
 
 class TransformerWrapper(nn.Module):
     def __init__(self, vocab_size, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, num_layers=6, dropout=0.,
-                 tie_emb_weights=True, max_len=1000, layer_norm=True):
+                 tie_emb_weights=True, max_len=1000, layer_norm=True, use_softmax1: bool = False):
         super().__init__()
         self.emb = nn.Parameter(torch.randn(vocab_size, dim_model) / np.sqrt(dim_model))
         self.pos_enc = LearnedPositionalEncoding(dim_model, max_len=max_len)
@@ -284,7 +302,8 @@ class TransformerWrapper(nn.Module):
             dim_inner=dim_inner,
             num_layers=num_layers,
             dropout=dropout,
-            layer_norm=layer_norm
+            layer_norm=layer_norm,
+            use_softmax1=use_softmax1
         )
         self.tie_emb_weights = tie_emb_weights
         if not self.tie_emb_weights:

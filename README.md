@@ -17,6 +17,9 @@ This repo is for experiments related to grokking, inspired by the
 The initial goal is to reproduce the results and analysis from the paper. Then the aim is to run additional experiments in 
 the same general set-up to aid my understanding and intuition of the phenomena described in the paper.
 
+![Fourier Embedding](images/fourier_embedding.gif)
+
+
 ## TODO
 - [x] implement dataset and datamodule
 - [x] implement model

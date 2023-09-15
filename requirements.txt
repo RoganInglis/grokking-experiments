@@ -24,3 +24,7 @@ pytest          # tests
 
 einops
 wandb
+kaleido
+plotly
+pandas
+imageio

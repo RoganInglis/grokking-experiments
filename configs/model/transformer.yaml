@@ -26,4 +26,5 @@ net:
   tie_emb_weights: false
   max_len: 3
   layer_norm: false
+  use_softmax1: false
 

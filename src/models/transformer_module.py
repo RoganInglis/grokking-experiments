@@ -1,6 +1,9 @@
 from typing import Any, List
 
+import os
 import torch
+import plotly.express as px
+import pandas as pd
 from pytorch_lightning import LightningModule
 from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.classification.accuracy import Accuracy
@@ -37,6 +40,8 @@ class TransformerLitModule(LightningModule):
         # for tracking best so far validation accuracy
         self.val_acc_best = MaxMetric()
 
+        self.image_output_dir = None
+
     def forward(self, x: torch.Tensor):
         return self.net(x)
 
@@ -72,6 +77,18 @@ class TransformerLitModule(LightningModule):
         # `outputs` is a list of dicts returned from `training_step()`
         pass
 
+    def save_fourier_embedding_image(self, batch_idx: int):
+        if self.image_output_dir is None:
+            self.image_output_dir = os.path.join(self.logger.save_dir, 'images')
+            os.makedirs(self.image_output_dir, exist_ok=True)
+
+        emb_weights = self.net.emb.detach().cpu()
+        emb_fourier_norm = torch.fft.fft(emb_weights, dim=0).norm(dim=1).numpy()
+        df = pd.DataFrame({'Frequency k': range(len(emb_fourier_norm[:emb_fourier_norm.shape[0] // 2])),
+                           'Norm of Fourier Component': emb_fourier_norm[:emb_fourier_norm.shape[0] // 2]})
+        fig = px.bar(df, x='Frequency k', y='Norm of Fourier Component', title='Fourier Components of Embedding Matrix')
+        fig.write_image(os.path.join(self.image_output_dir, f'fourier_embedding_{"{:06}".format(batch_idx)}.png'))
+
     def validation_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
 
@@ -89,6 +106,8 @@ class TransformerLitModule(LightningModule):
         # log `val_acc_best` as a value through `.compute()` method, instead of as a metric object
         # otherwise metric would be reset by lightning after each epoch
         self.log("val/acc_best", self.val_acc_best.compute(), prog_bar=True)
+
+        self.save_fourier_embedding_image(self.current_epoch)
 
     def test_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
