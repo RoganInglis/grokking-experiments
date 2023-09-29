@@ -87,14 +87,12 @@ class TransformerLitModule(LightningModule):
         emb_weights = self.net.emb.detach().cpu()
         emb_fourier_norm = torch.fft.fft(emb_weights, dim=0).norm(dim=1)
 
-        data = torch.cat([torch.arange(emb_fourier_norm.shape[0] // 2).unsqueeze(1), emb_fourier_norm[:emb_fourier_norm.shape[0] // 2].unsqueeze(1)], dim=1).numpy().tolist()
-        table = wandb.Table(data=data, columns=["Frequency k", "Norm of Fourier Component"])
-        wandb.log({"fourier_embedding": wandb.plot.bar(table, "Frequency k", "Norm of Fourier Component", title="Fourier Components of Embedding Matrix")})
-
-        #df = pd.DataFrame({'Frequency k': range(len(emb_fourier_norm[:emb_fourier_norm.shape[0] // 2])),
-        #                   'Norm of Fourier Component': emb_fourier_norm[:emb_fourier_norm.shape[0] // 2]})
-        #fig = px.bar(df, x='Frequency k', y='Norm of Fourier Component', title='Fourier Components of Embedding Matrix')
-        #fig.write_image(os.path.join(self.image_output_dir, f'fourier_embedding_{"{:06}".format(batch_idx)}.png'))
+        df = pd.DataFrame({'Frequency k': range(len(emb_fourier_norm[:emb_fourier_norm.shape[0] // 2])),
+                           'Norm of Fourier Component': emb_fourier_norm[:emb_fourier_norm.shape[0] // 2]})
+        fig = px.bar(df, x='Frequency k', y='Norm of Fourier Component', title='Fourier Components of Embedding Matrix', range_y=[0, 50])
+        file_path = os.path.join(self.image_output_dir, f'fourier_embedding_{"{:06}".format(batch_idx)}.png')
+        fig.write_image(file_path)
+        wandb.log({'Fourier Components of Embedding Matrix': wandb.Image(file_path)})
 
     def validation_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)

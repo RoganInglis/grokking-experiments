@@ -290,8 +290,11 @@ class Transformer(nn.Module):
 
 class TransformerWrapper(nn.Module):
     def __init__(self, vocab_size, dim_model=512, num_heads=8, dim_heads=64, dim_inner=2048, num_layers=6, dropout=0.,
-                 tie_emb_weights=True, max_len=1000, layer_norm=True, use_softmax1: bool = False):
+                 tie_emb_weights=True, max_len=1000, layer_norm=True, use_softmax1: bool = False,
+                 num_registers: int = 0):
         super().__init__()
+
+
         self.emb = nn.Parameter(torch.randn(vocab_size, dim_model) / np.sqrt(dim_model))
         self.pos_enc = LearnedPositionalEncoding(dim_model, max_len=max_len)
         self.dropout = nn.Dropout(dropout)
