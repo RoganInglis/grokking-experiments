@@ -27,4 +27,5 @@ net:
   max_len: 3
   layer_norm: false
   use_softmax1: false
+  num_registers: 0
 

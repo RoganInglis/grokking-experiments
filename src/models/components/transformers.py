@@ -6,7 +6,7 @@ from torch import nn
 import einops
 
 
-def create_attn_mask(seq_len):
+def git statcreate_attn_mask(seq_len):
     return torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
 
 
@@ -84,7 +84,9 @@ class MultiHeadAttention(nn.Module):
 
         self.scale = dim_heads ** -0.5
 
-        self.w_qkv = nn.Linear(in_features=dim_model, out_features=self.dim_inner, bias=False)
+        self.w_q = Linear(in_features=dim_model, out_features=self.dim_inner, bias=False)
+        self.w_k = Linear(in_features=dim_model, out_features=self.dim_inner, bias=False)
+        self.w_v = Linear(in_features=dim_model, out_features=self.dim_inner, bias=False)
         self.w_out = nn.Linear(in_features=self.dim_inner, out_features=dim_model, bias=False)
         if use_softmax1:
             self.softmax = Softmax1(dim=-1)
@@ -101,11 +103,9 @@ class MultiHeadAttention(nn.Module):
         :return:
         """
         # Project to query, key, value and split into heads
-        qkv = einops.rearrange(
-            self.w_qkv(torch.cat((x_q, x_k, x_v), dim=0)),
-            'b s (h d) -> b h s d', h=self.num_heads
-        )
-        q, k, v = qkv.chunk(3, dim=0)
+        q = einops.rearrange(self.w_q(x_q), 'b s (h d) -> b h s d', h=self.num_heads)
+        k = einops.rearrange(self.w_k(x_k), 'b s (h d) -> b h s d', h=self.num_heads)
+        v = einops.rearrange(self.w_v(x_v), 'b s (h d) -> b h s d', h=self.num_heads)
 
         # Calculate attention weights
         attn = torch.einsum('b h q d, b h k d -> b h q k', q, k) * self.scale
@@ -294,9 +294,13 @@ class TransformerWrapper(nn.Module):
                  num_registers: int = 0):
         super().__init__()
 
-
         self.emb = nn.Parameter(torch.randn(vocab_size, dim_model) / np.sqrt(dim_model))
         self.pos_enc = LearnedPositionalEncoding(dim_model, max_len=max_len)
+
+        self.num_registers = num_registers
+        if num_registers > 0:
+            self.register = nn.Parameter(torch.randn(num_registers, dim_model) / np.sqrt(dim_model))
+
         self.dropout = nn.Dropout(dropout)
         self.transformer = Transformer(
             dim_model=dim_model,
@@ -317,8 +321,23 @@ class TransformerWrapper(nn.Module):
     def forward(self, x):
         x = self.emb[x]
         x = self.pos_enc(x)  # / math.sqrt(self.emb.embedding_dim)))
+
+        if self.num_registers > 0:
+            x = torch.cat([x, self.register.unsqueeze(0).repeat(x.shape[0], 1, 1)], dim=1)
+
         x = self.dropout(x)
-        x = self.transformer(x, mask=self.attn_mask[:x.size(1), :x.size(1)])
+
+        mask = self.attn_mask[:x.size(1), :x.size(1)]
+
+        if self.num_registers > 0:
+            mask = torch.cat([mask, torch.zeros(mask.shape[0], self.num_registers, dtype=mask.dtype, device=mask.device)], dim=1)
+            mask = torch.cat([mask, torch.zeros(self.num_registers, mask.shape[1], dtype=mask.dtype, device=mask.device)], dim=0)
+
+        x = self.transformer(x, mask=mask)
+
+        if self.num_registers > 0:
+            x = x[:, :-self.num_registers, :]
+
         if self.tie_emb_weights:
             return x @ self.emb.T
         else:
