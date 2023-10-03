@@ -6,7 +6,7 @@ from torch import nn
 import einops
 
 
-def git statcreate_attn_mask(seq_len):
+def create_attn_mask(seq_len):
     return torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
 
 
