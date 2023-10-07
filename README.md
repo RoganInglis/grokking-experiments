@@ -24,6 +24,8 @@ fourier components than the original Softmax. Could investigate this further.
 
 ![Fourier Embedding Softmax1](images/fourier_embedding_softmax_1.gif)
 
+![Attention Score For Head 0](images/attention_scores_head_0.gif)
+
 
 ## TODO
 - [x] implement dataset and datamodule

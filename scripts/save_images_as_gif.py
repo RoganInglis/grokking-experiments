@@ -3,8 +3,8 @@ import imageio
 
 
 def main():
-    images_dir = '/home/rogan/git_repos/grokking-experiments/logs/train/runs/2023-10-02_09-56-23/images'
-    output_path = '/home/rogan/git_repos/grokking-experiments/logs/train/runs/2023-10-02_09-56-23/fourier_embedding.gif'
+    images_dir = '/home/rogan/git_repos/grokking-experiments/logs/train/runs/2023-10-07_21-32-33/images/attention'
+    output_path = '/images/attention_scores_head_0.gif'
     image_filenames = [f for f in os.listdir(images_dir) if f.endswith('.png')]
 
     image_filenames = sorted([os.path.join(images_dir, f) for f in image_filenames], key=lambda x: int(x.rsplit("_", 1)[1].split(".")[0]))
