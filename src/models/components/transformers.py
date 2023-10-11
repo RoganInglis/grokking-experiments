@@ -87,7 +87,7 @@ class MultiHeadAttention(nn.Module):
         self.w_q = Linear(in_features=dim_model, out_features=self.dim_inner, bias=False)
         self.w_k = Linear(in_features=dim_model, out_features=self.dim_inner, bias=False)
         self.w_v = Linear(in_features=dim_model, out_features=self.dim_inner, bias=False)
-        self.w_out = nn.Linear(in_features=self.dim_inner, out_features=dim_model, bias=False)
+        self.w_out = Linear(in_features=self.dim_inner, out_features=dim_model, bias=False)
         if use_softmax1:
             self.softmax = Softmax1(dim=-1)
         else:
@@ -134,10 +134,10 @@ class FeedForward(nn.Module):
         # TODO - allow for different activation functions
 
         self.net = nn.Sequential(
-            nn.Linear(dim_model, dim_inner),
+            Linear(dim_model, dim_inner),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(dim_inner, dim_model),
+            Linear(dim_inner, dim_model),
             nn.Dropout(dropout),
         )
 
@@ -294,6 +294,7 @@ class TransformerWrapper(nn.Module):
                  num_registers: int = 0):
         super().__init__()
 
+        self.vocab_size = vocab_size
         self.emb = nn.Parameter(torch.randn(vocab_size, dim_model) / np.sqrt(dim_model))
         self.pos_enc = LearnedPositionalEncoding(dim_model, max_len=max_len)
 

@@ -11,6 +11,14 @@ from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.classification.accuracy import Accuracy
 
 
+def save_and_log_2d_heatmap_image(heatmap_2d: torch.tensor, title: str, batch_idx: int, image_output_dir: str, image_name: str):
+    df = pd.DataFrame(heatmap_2d)
+    fig = px.imshow(df, title=title)
+    file_path = os.path.join(image_output_dir, f'{image_name}_{"{:06}".format(batch_idx)}.png')
+    fig.write_image(file_path)
+    wandb.log({title: wandb.Image(file_path)})
+
+
 class TransformerLitModule(LightningModule):
     def __init__(
         self,
@@ -97,8 +105,26 @@ class TransformerLitModule(LightningModule):
         fig.write_image(file_path)
         wandb.log({'Fourier Components of Embedding Matrix': wandb.Image(file_path)})
 
+    def save_fourier_neuron_logit_image(self, batch_idx: int):
+        if self.image_output_dir is None:
+            self.image_output_dir = os.path.join(self.logger.save_dir, 'images')
+            os.makedirs(self.image_output_dir, exist_ok=True)
+
+        img_dir = os.path.join(self.image_output_dir, 'neuron_logit')
+        os.makedirs(img_dir, exist_ok=True)
+
+        weights = self.net.out.detach().cpu()
+        fourier_norm = torch.fft.fft(weights, dim=1).norm(dim=0)
+
+        df = pd.DataFrame({'Frequency k': range(len(fourier_norm[:fourier_norm.shape[0] // 2])),
+                           'Norm of Fourier Component': fourier_norm[:fourier_norm.shape[0] // 2]})
+        fig = px.bar(df, x='Frequency k', y='Norm of Fourier Component', title='Fourier Components of Neuron-Logit Map', range_y=[0, 50])
+        file_path = os.path.join(img_dir, f'fourier_neuron_logit_{"{:06}".format(batch_idx)}.png')
+        fig.write_image(file_path)
+        wandb.log({'Fourier Components of Neuron-Logit Map': wandb.Image(file_path)})
+
     def compute_model_history(self):
-        p = 113   # TODO - make this a parameter
+        p = self.net.vocab_size - 1
         x = torch.stack([
             torch.arange(0, p).unsqueeze(-1).expand(-1, p).reshape(-1),
             torch.arange(0, p).repeat(p),
@@ -116,15 +142,17 @@ class TransformerLitModule(LightningModule):
         os.makedirs(attention_img_dir, exist_ok=True)
 
         # Get attention score for relevant head
-        p = 113  # TODO - make this a parameter
+        p = self.net.vocab_size - 1
         attention_score_for_head = model_history['transformer.layers.0.attn.fn.softmax'].tensor_contents[:, head, -1, 0].reshape(p, p).detach().cpu().numpy()
 
         # Plot as heatmap
-        df = pd.DataFrame(attention_score_for_head)
-        fig = px.imshow(df, title=f'Attention Score for Head {head}')
-        file_path = os.path.join(attention_img_dir, f'attention_score_for_head_{head}_{"{:06}".format(batch_idx)}.png')
-        fig.write_image(file_path)
-        wandb.log({f'Attention Score for Head {head}': wandb.Image(file_path)})
+        save_and_log_2d_heatmap_image(
+            attention_score_for_head,
+            f'Attention Score for Head {head}',
+            batch_idx,
+            attention_img_dir,
+            f'attention_score_for_head_{head}'
+        )
 
     def save_activation_for_neuron_image(self, batch_idx: int, model_history: dict, neuron: int = 0):
         if self.image_output_dir is None:
@@ -135,15 +163,17 @@ class TransformerLitModule(LightningModule):
         os.makedirs(activation_img_dir, exist_ok=True)
 
         # Get activation for relevant neuron
-        p = 113
+        p = self.net.vocab_size - 1
         activation_for_neuron = model_history['transformer.layers.0.ff.fn.net.1'].tensor_contents[:, -1, neuron].reshape(p, p).detach().cpu().numpy()
 
         # Plot as heatmap
-        df = pd.DataFrame(activation_for_neuron)
-        fig = px.imshow(df, title=f'Activation for Neuron {neuron}')
-        file_path = os.path.join(activation_img_dir, f'activation_for_neuron_{neuron}_{"{:06}".format(batch_idx)}.png')
-        fig.write_image(file_path)
-        wandb.log({f'Activation for Neuron {neuron}': wandb.Image(file_path)})
+        save_and_log_2d_heatmap_image(
+            activation_for_neuron,
+            f'Activation for Neuron {neuron}',
+            batch_idx,
+            activation_img_dir,
+            f'activation_for_neuron_{neuron}'
+        )
 
     def save_norm_of_logits_in_2d_fourier_basis_image(self, batch_idx: int, model_history: dict):
         if self.image_output_dir is None:
@@ -154,18 +184,21 @@ class TransformerLitModule(LightningModule):
         os.makedirs(logits_img_dir, exist_ok=True)
 
         # Get logits
-        p = 113
+        p = self.net.vocab_size - 1
         logits = model_history['output'].tensor_contents[:, -1, :].detach().cpu().numpy()
 
         # Get norm of logits in 2d fourier basis
         logits_fourier_norm = torch.fft.fft(torch.tensor(logits), dim=0).norm(dim=1).reshape(p, p).detach().cpu().numpy()
+        logits_fourier_norm = logits_fourier_norm[:logits_fourier_norm.shape[0] // 2, :logits_fourier_norm.shape[1] // 2]
 
         # Plot as heatmap
-        df = pd.DataFrame(logits_fourier_norm)
-        fig = px.imshow(df, title=f'Norm of Logits in 2d Fourier Basis')
-        file_path = os.path.join(logits_img_dir, f'logits_fourier_norm_{"{:06}".format(batch_idx)}.png')
-        fig.write_image(file_path)
-        wandb.log({f'Norm of Logits in 2d Fourier Basis': wandb.Image(file_path)})
+        save_and_log_2d_heatmap_image(
+            logits_fourier_norm,
+            'Norm of Logits in 2d Fourier Basis',
+            batch_idx,
+            logits_img_dir,
+            'logits_fourier_norm'
+        )
 
     def validation_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
@@ -191,6 +224,7 @@ class TransformerLitModule(LightningModule):
         self.save_norm_of_logits_in_2d_fourier_basis_image(self.current_epoch, model_history)
 
         self.save_fourier_embedding_image(self.current_epoch)
+        self.save_fourier_neuron_logit_image(self.current_epoch)
 
     def test_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)

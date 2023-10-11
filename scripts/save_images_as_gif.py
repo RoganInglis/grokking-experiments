@@ -6,10 +6,10 @@ from more_itertools import chunked
 
 
 def main():
-    images_dir = '/home/rogan/git_repos/grokking-experiments/logs/train/runs/2023-10-11_18-48-15/images'
+    images_dir = '/home/rogan/git_repos/grokking-experiments/logs/train/runs/2023-10-11_20-49-24/images'
     output_path = '/home/rogan/git_repos/grokking-experiments/images/animation.gif'
 
-    subdirs = ['embedding', 'attention', 'activation', 'logits']
+    subdirs = ['embedding', 'neuron_logit', 'attention', 'activation', 'logits']
     image_filenames = defaultdict(list)
     for subdir in subdirs:
         image_filenames[subdir] = [f for f in os.listdir(os.path.join(images_dir, subdir)) if f.endswith('.png')]

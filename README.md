@@ -30,6 +30,20 @@ fourier components than the original Softmax. Could investigate this further. Ma
 - [x] implement model
 - [x] confirm that model displays grokking behaviour
 - [ ] reproduce the analysis from the paper
+  - [x] Fourier components of embedding matrix
+  - [x] Fourier components of neuron-logit map
+  - [x] Attention score for head 0
+  - [x] Activations for neuron 0
+  - [x] Norms of logits in 2d fourier basis
+  - [ ] test and train loss over time
+  - [ ] test and train accuracy over time
+  - [ ] FVE by degree-2 polynomials
+  - [ ] Components of W_L corresponding to freq 14 neurons
+  - [ ] Loss after ablating frequencies
+  - [ ] Test, train, excluded loss over all freqs
+  - [ ] Restricted test, train, excluded loss
+  - [ ] Gini coefficients of embed matrix and neuron-logit map
+  - [ ] Total sum of squared weights
 - [ ] run additional experiments
 
 ## Notes
