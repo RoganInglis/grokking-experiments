@@ -126,6 +126,47 @@ class TransformerLitModule(LightningModule):
         fig.write_image(file_path)
         wandb.log({f'Attention Score for Head {head}': wandb.Image(file_path)})
 
+    def save_activation_for_neuron_image(self, batch_idx: int, model_history: dict, neuron: int = 0):
+        if self.image_output_dir is None:
+            self.image_output_dir = os.path.join(self.logger.save_dir, 'images')
+            os.makedirs(self.image_output_dir, exist_ok=True)
+
+        activation_img_dir = os.path.join(self.image_output_dir, 'activation')
+        os.makedirs(activation_img_dir, exist_ok=True)
+
+        # Get activation for relevant neuron
+        p = 113
+        activation_for_neuron = model_history['transformer.layers.0.ff.fn.net.1'].tensor_contents[:, -1, neuron].reshape(p, p).detach().cpu().numpy()
+
+        # Plot as heatmap
+        df = pd.DataFrame(activation_for_neuron)
+        fig = px.imshow(df, title=f'Activation for Neuron {neuron}')
+        file_path = os.path.join(activation_img_dir, f'activation_for_neuron_{neuron}_{"{:06}".format(batch_idx)}.png')
+        fig.write_image(file_path)
+        wandb.log({f'Activation for Neuron {neuron}': wandb.Image(file_path)})
+
+    def save_norm_of_logits_in_2d_fourier_basis_image(self, batch_idx: int, model_history: dict):
+        if self.image_output_dir is None:
+            self.image_output_dir = os.path.join(self.logger.save_dir, 'images')
+            os.makedirs(self.image_output_dir, exist_ok=True)
+
+        logits_img_dir = os.path.join(self.image_output_dir, 'logits')
+        os.makedirs(logits_img_dir, exist_ok=True)
+
+        # Get logits
+        p = 113
+        logits = model_history['transformer.layers.0.ff.fn.net.2'].tensor_contents[:, -1, 0].reshape(p, p).detach().cpu().numpy()
+
+        # Get norm of logits in 2d fourier basis
+        logits_fourier_norm = torch.fft.fft(torch.tensor(logits), dim=0).norm(dim=1).detach().cpu().numpy()
+
+        # Plot as heatmap
+        df = pd.DataFrame(logits_fourier_norm)
+        fig = px.imshow(df, title=f'Norm of Logits in 2d Fourier Basis')
+        file_path = os.path.join(logits_img_dir, f'logits_fourier_norm_{"{:06}".format(batch_idx)}.png')
+        fig.write_image(file_path)
+        wandb.log({f'Norm of Logits in 2d Fourier Basis': wandb.Image(file_path)})
+
     def validation_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
 
@@ -146,6 +187,7 @@ class TransformerLitModule(LightningModule):
 
         model_history = self.compute_model_history()
         self.save_attention_score_for_head_image(self.current_epoch, model_history)
+        self.save_activation_for_neuron_image(self.current_epoch, model_history)
 
         self.save_fourier_embedding_image(self.current_epoch)
 

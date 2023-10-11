@@ -17,14 +17,12 @@ This repo is for experiments related to grokking, inspired by the
 The initial goal is to reproduce the results and analysis from the paper. Then the aim is to run additional experiments in 
 the same general set-up to aid my understanding and intuition of the phenomena described in the paper.
 
-![Fourier Embedding](images/fourier_embedding.gif)
+![Animation](images/animation.gif)
 
 Using Softmax1 as proposed [here](https://www.evanmiller.org/attention-is-off-by-one.html) appears to produce cleaner 
 fourier components than the original Softmax. Could investigate this further.
 
 ![Fourier Embedding Softmax1](images/fourier_embedding_softmax_1.gif)
-
-![Attention Score For Head 0](images/attention_scores_head_0.gif)
 
 
 ## TODO
