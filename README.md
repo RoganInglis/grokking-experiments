@@ -22,7 +22,7 @@ the same general set-up to aid my understanding and intuition of the phenomena d
 Using Softmax1 as proposed [here](https://www.evanmiller.org/attention-is-off-by-one.html) appears to produce cleaner 
 fourier components than the original Softmax. Could investigate this further. May just because it leads to faster convergence.
 
-![Fourier Embedding Softmax1](images/fourier_embedding_softmax_1.gif)
+![Animation Softmax1](images/animation_softmax1.gif)
 
 
 ## TODO

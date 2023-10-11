@@ -6,8 +6,8 @@ from more_itertools import chunked
 
 
 def main():
-    images_dir = '/home/rogan/git_repos/grokking-experiments/logs/train/runs/2023-10-11_20-49-24/images'
-    output_path = '/home/rogan/git_repos/grokking-experiments/images/animation.gif'
+    images_dir = '/home/rogan/git_repos/grokking-experiments/logs/train/runs/2023-10-11_21-15-39/images'
+    output_path = '/home/rogan/git_repos/grokking-experiments/images/animation_softmax1.gif'
 
     subdirs = ['embedding', 'neuron_logit', 'attention', 'activation', 'logits']
     image_filenames = defaultdict(list)
