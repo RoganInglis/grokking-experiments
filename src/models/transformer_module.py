@@ -155,10 +155,10 @@ class TransformerLitModule(LightningModule):
 
         # Get logits
         p = 113
-        logits = model_history['transformer.layers.0.ff.fn.net.2'].tensor_contents[:, -1, 0].reshape(p, p).detach().cpu().numpy()
+        logits = model_history['output'].tensor_contents[:, -1, :].detach().cpu().numpy()
 
         # Get norm of logits in 2d fourier basis
-        logits_fourier_norm = torch.fft.fft(torch.tensor(logits), dim=0).norm(dim=1).detach().cpu().numpy()
+        logits_fourier_norm = torch.fft.fft(torch.tensor(logits), dim=0).norm(dim=1).reshape(p, p).detach().cpu().numpy()
 
         # Plot as heatmap
         df = pd.DataFrame(logits_fourier_norm)
@@ -188,6 +188,7 @@ class TransformerLitModule(LightningModule):
         model_history = self.compute_model_history()
         self.save_attention_score_for_head_image(self.current_epoch, model_history)
         self.save_activation_for_neuron_image(self.current_epoch, model_history)
+        self.save_norm_of_logits_in_2d_fourier_basis_image(self.current_epoch, model_history)
 
         self.save_fourier_embedding_image(self.current_epoch)
 
